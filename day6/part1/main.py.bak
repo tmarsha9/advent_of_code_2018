@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+
+#old solution that does not work where I tried and failed to find the points
+#with infinite area by computing the convex hull of the point set
+
+def add_point(row, col, point_id, grid, points):
+  while len(grid) <= row:
+    grid.append(grid[0][:])
+
+  while len(grid[0]) <= col:
+    for i in range(len(grid)):
+      grid[i].append('.')
+
+  grid[row][col] = point_id
+  points.append((row,col))
+
+def inc_str(s,pos):
+  while pos < 0:
+    pos += len(s) #modular math
+
+  if ord(s[pos]) + 1 > ord('Z'):
+    #incrementing pos results in going beyond 'Z'
+
+    if pos == 0:
+      #need new char
+      s = 'A' * (len(s) + 1)
+    else:
+      #reset current char to 'A' and inc next char
+      s = s[:pos] + 'A' + s[pos+1:]
+      s = inc_str(s,pos-1)
+  else:
+    #regular increment
+    s = s[:pos] + chr(ord(s[pos]) + 1) + s[pos+1:]
+
+  return s
+
+def get_convex_hull(points):
+  #discrete convex hull
+  #start on grid boundary and work way inwards from each direction until point is hit
+
+  hull = [] #list of points on hull
+
+  #find top most point(s)
+  sort_by_distance_from_top    = sorted(points, key=lambda p: p[0])
+
+  #find bottom most point(s)
+  sort_by_distance_from_bottom = sorted(points, key=lambda p: p[0], reverse=True)
+
+  #find left most point(s)
+  sort_by_distance_from_left = sorted(points, key=lambda p: p[1])
+
+  #find right most point(s)
+  sort_by_distance_from_right = sorted(points, key=lambda p: p[1], reverse=True)
+
+  #add all top most points
+  hull.append(sort_by_distance_from_top[0])
+  for point in sort_by_distance_from_top[1:]:
+    if point[0] == hull[-1][0]:
+      if point not in hull:
+        hull.append(point)
+    else:
+      break
+
+  #add all bottom most points
+  hull.append(sort_by_distance_from_bottom[0])
+  for point in sort_by_distance_from_bottom[1:]:
+    if point[0] == hull[-1][0]:
+      hull.append(point)
+    else:
+      break
+
+  #add all left most points
+  hull.append(sort_by_distance_from_left[0])
+  for point in sort_by_distance_from_left[1:]:
+    if point[1] == hull[-1][1]:
+      hull.append(point)
+    else:
+      break
+
+  #add all right most points
+  hull.append(sort_by_distance_from_right[0])
+  for point in sort_by_distance_from_right[1:]:
+    if point[1] == hull[-1][1]:
+      hull.append(point)
+    else:
+      break
+
+  rv = list(set(hull)) #remove duplicates
+
+  return rv
+
+def get_dist(pos1, pos2):
+  """manhattan distance"""
+  return abs(pos1[0]-pos2[0]) + abs(pos1[1]-pos2[1])
+
+def get_closest_point(pos, points):
+  smallest_dist = get_dist(pos, points[0])
+  closest_point = points[0]
+
+  for point in points[1:]:
+    dist = get_dist(pos, point)
+    if dist < smallest_dist:
+      smallest_dist = dist
+      closest_point = point
+    elif dist == smallest_dist:
+      closest_point = None #ties are not allowed
+
+  return closest_point
+
+def compute_areas(grid, points, hull):
+  areas = {} # maps point -> number of cells that have that point as closest
+
+  for row in range(len(grid)):
+    for col in range(len(grid[0])):
+      if grid[row][col] == '.':
+        point = get_closest_point((row,col), points)
+
+        if point not in hull:
+          if point not in areas:
+            areas[point] = 0
+
+          areas[point] += 1
+        #else leave blank, ignoring points closest to hull
+      else:
+        #every point is closest to itself
+        if (row,col) not in hull:
+          if (row,col) not in areas:
+            areas[(row,col)] = 0
+          areas[(row,col)] += 1
+
+  return areas
+  
+
+with open("../input.txt", "r") as f:
+  #start with just origin
+  grid = [['.']]
+  points = []
+  next_id = 'A'
+
+  for thing in f:
+    line = thing.strip().split(', ')
+    add_point(int(line[1]), int(line[0]), next_id, grid, points)
+    next_id=inc_str(next_id,-1)
+
+  #any point on hull will have infinite area associated with it. Find the convex hull
+  hull = get_convex_hull(points)
+
+  #compute distances for all cells ignoring when the closest point is a point on the hull
+  #compute area of each group of cells that are closest to the same point
+  areas = compute_areas(grid, points, hull)
+
+  #find point with largest area
+  biggest_area = sorted(areas.items(), key=lambda thing: thing[1], reverse=True)
+  print(biggest_area)
+  print(hull)
